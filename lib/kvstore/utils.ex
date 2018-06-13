@@ -1,1 +1,3 @@
-Здесь можно собрать вспомогательные функци
+defmodule Kvstore.Utils do
+
+end
