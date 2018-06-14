@@ -2,11 +2,22 @@
 defmodule Kvstore.Storage do
   alias Kvstore.Utils
 
+  ## CRUD построена на :dets, т.к. в 
+  ## данном случае не требуется более мощный функционал,
+  ## который может предоставить mnesia или Postgres
+  
   def start() do
     :dets.open_file(:storage, [type: :set])
   end
 
-  def create(data, _ttl) do
+  ##  При входе в любую из структур CRUD 
+  ##  и выходе из нее data представляет собой map или struct,
+  ##  из-за чего приходится использовать парсеры и ан-парсеры
+  ##  этого можно избежать, изменив формат входных и выходных 
+  ##  данных, хотя мне представляется наиболее очевидным 
+  ##  вариантом использования данных структур
+
+  def create(data, _ttl) do    
     data = Utils.parse(:data, data)
     if :dets.insert_new(:storage, data) do
       {:ok}
@@ -18,6 +29,7 @@ defmodule Kvstore.Storage do
   def read(keys) do
     keys = Utils.parse(:keys, keys)
     :dets.match_object(:storage, keys)
+    |> Utils.un_parse([])
   end
 
   def update(old_data, new_data) do
