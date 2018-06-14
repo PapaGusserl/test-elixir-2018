@@ -12,14 +12,14 @@ defmodule Kvstore.Router do
   post "/create" do
     body = valid? :data, 
                   conn.body_params, 
-                  Storage.create(conn.body_params, conn.body_params.ttl)
+                  Storage.create
     send_resp(conn, 200, body)    
   end
 
   post "/read" do
     body = valid? :keys, 
                   conn.body_params,
-                  Storage.read(conn.body_params)
+                  Storage.read
     send_resp(conn, 200, body)    
   end
 
@@ -28,14 +28,14 @@ defmodule Kvstore.Router do
     body = valid? :data, 
                   conn.body_params.old_data, 
                   conn.body_params.new_data, 
-                  Storage.update(conn.body_params.old_data, conn.body_params.new_data)
+                  Storage.update
     send_resp(conn, 200, body)
   end
 
   post "/delete" do
     body = valid? :data,
                   conn.body_params,
-                  Storage.delete(conn.body_params)
+                  Storage.delete
     send_resp(conn, 200, body)
   end
 
