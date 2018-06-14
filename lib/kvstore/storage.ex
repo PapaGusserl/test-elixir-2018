@@ -7,6 +7,7 @@ defmodule Kvstore.Storage do
   end
 
   def create(data, _ttl) do
+    data = Utils.parse(:data, data)
     if :dets.insert_new(:storage, data) do
       {:ok}
     else
@@ -20,12 +21,13 @@ defmodule Kvstore.Storage do
   end
 
   def update(old_data, new_data) do
-    :dets.delete(old_data)
-    :dets.insert_new(new_data)
+    Utils.parse(:data, old_data) |> delete
+    Utils.parse(:data, new_data) |> create
     {:ok}
   end
 
   def delete(data) do
+    data = Utils.parse(:data, data)
     :dets.delete(:storage, data)
   end
 

@@ -6,4 +6,6 @@ defmodule Kvstore.Utils do
     |> Map.merge(keys)
   end
 
+  def parse(:data, data), do: parse(:keys, data)
+
 end
