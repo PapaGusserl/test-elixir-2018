@@ -2,14 +2,16 @@ defmodule Kvstore.Utils do
 
   def valid?(:data, data, fun) do
     valid?(:keys, data, &(&1))
-     valid?(:values, data)
-    fun(data)
+    |> have_errors?(valid?(:values))
+    |> have_errors?(fun)
   end
 
   def valid?(:data, old_data, new_data, fun) do
     valid?(:data, old_data, &(&1))
-    valid?(:data, new_data, &(&1))
-    fun(old_data, new_data)
+    |> have_errors?( fn data ->
+                      valid?(:data, new_data, &(&1))
+                      |> have_errors?(fun(:new, data)
+                    end)
   end
 
   def valid?(:keys, data, fun) do
@@ -48,5 +50,10 @@ defmodule Kvstore.Utils do
 
     defp is_date(%DateTime{}), do: :true
     defp is_date(_), do: :false
+    defp have_errors?({:error, reason}, _fun), do: {:error, reason}
+    defp have_errors?(data, fun(:new, old)), do: fun(old, data)
+    defp have_errors?(data, fun(atom)), do: fun(atom, data)
+    defp have_errors?(data, fun), do: fun(data)
+
 
 end
