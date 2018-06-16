@@ -32,11 +32,11 @@ defmodule Kvstore.Storage do
     # осталось с прошлой сессии 
     # and send to killing ttl in milliseconds, becouse we hope, that 
     # shit will selfkill in our session
-    GenServer.cast(pid, {:set_timer, data.ttl})
+    GenServer.cast(__MODULE__, {:set_timer, key_field, data.ttl})
   end
 
   def read(data) do
-    result 
+    data #result 
     |> Enum.map( 
       fn map -> 
         :dets.match_object(:ttl, {Enum.first(map), :"_"})
@@ -82,7 +82,7 @@ defmodule Kvstore.Storage do
     GenServer.cast(self(), {:delete, key})
   end
 
-  def handle_cast(:set_timer, _state) do
+  def handle_cast({:set_timer, key, ttl}, _state) do
     Process.send_after(self(), {:delete, key}, ttl)
   end
 
@@ -90,10 +90,10 @@ defmodule Kvstore.Storage do
   defp key_exist?(key, state) do
     state
     |> Enum.filter( fn {k, v} -> k == key end)
-    |> fn
+    |> (fn
       [{_, value}] -> state -- {key, value}
       _ -> state
-    end
+    end).()
   end
      
 
