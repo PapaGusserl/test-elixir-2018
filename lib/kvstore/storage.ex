@@ -3,6 +3,7 @@ defmodule Kvstore.Storage do
 
   use GenServer
   alias Kvstore.Utils
+ 
   # Так как нам необходимо предусмотреть возможность
   # отключения программы с сохранением предустановленного
   # времени жизни, то привязка ttl идет не относительному 
@@ -24,10 +25,11 @@ defmodule Kvstore.Storage do
 
   def create(data) do
     key_field = Enum.first(data)
+    ttl = if data.ttl == nil, do:  Application.get_env(:kvstore, :default_ttl), else: data.ttl
     # если ttl передается в формате секунд, его необходимо переделать в "дату смерти"
-    ttl = Utils.parse(:ttl, data.ttl)
+    date_of_death = Utils.parse(:ttl, ttl)
     # сохраняем в dets, чтобы между сеансами ничего не потерялось
-    :dets.insert_new(:ttl, {key_field, ttl})
+    :dets.insert_new(:ttl, {key_field, date_of_death})
     # в state  не отправляем, так как там у нас хранится только то, что
     # осталось с прошлой сессии 
     # and send to killing ttl in milliseconds, becouse we hope, that 
@@ -58,7 +60,7 @@ defmodule Kvstore.Storage do
     {:ok, state}
   end
 
-  def handle_cast(:checks_after_power_off, state) do
+  def handle_cast(:check_after_power_off, state) do
     state
     |> Enum.map( 
       fn {key, date_of_death} ->
