@@ -2,7 +2,7 @@
 defmodule Kvstore.Storage do
 
   use GenServer
-
+  alias Kvstore.Utils
   # Так как нам необходимо предусмотреть возможность
   # отключения программы с сохранением предустановленного
   # времени жизни, то привязка ttl идет не относительному 
@@ -11,7 +11,7 @@ defmodule Kvstore.Storage do
 
   def start() do
     :dets.open_file(:ttl, [type: :set])
-    {:ok, pid} = start_link
+    {:ok, pid} = start_link()
     GenServer.cast(pid, :check_after_power_off)
     {:ok, pid}
   end
@@ -87,15 +87,14 @@ defmodule Kvstore.Storage do
   end
 
 
-  defp key_exist?(key, state) do
+  def key_exist?(key, state) do
     state
     |> Enum.filter( fn {k, v} -> k == key end)
     |> (fn
-      [{_, value}] -> state -- {key, value}
-      _ -> state
+      [{key, value}] -> state -- [{key, value}]
+      ______________ -> state
     end).()
   end
-     
 
 end
 
