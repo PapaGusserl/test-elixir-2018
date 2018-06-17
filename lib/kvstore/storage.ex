@@ -17,7 +17,7 @@ defmodule Kvstore.Storage do
   ##  данных, хотя мне представляется наиболее очевидным 
   ##  вариантом использования данных структур
 
-  def create(data, _ttl) do    
+  def create(data) do    
     data = Utils.parse(:data, data)
     if :dets.insert_new(:storage, data) do
       {:ok}

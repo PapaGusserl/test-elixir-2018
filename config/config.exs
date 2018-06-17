@@ -29,4 +29,4 @@ use Mix.Config
 #
 #     import_config "#{Mix.env}.exs"
 
-config :kvstore, keys: %{id: nil, username: nil, rules: nil, date: nil}
+config :kvstore, keys: [id: nil, rules: nil, username: nil, date: nil]
