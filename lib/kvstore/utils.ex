@@ -4,11 +4,14 @@ defmodule Kvstore.Utils do
 
   def parse(:keys, keys) do
     @cliche
-    |> Enum.into(%{})
-    |> Map.new(fn {key, value} -> {key, :"_"} end)
-    |> Map.merge(keys)
-    |> Map.values
-    |> Enum.sort
+    |> Enum.map(
+      fn {key, _value} -> 
+        if Map.has_key?(keys, key) do
+          keys[key]
+        else
+          :"_"
+        end
+      end)
     |> List.to_tuple
   end
 
@@ -24,7 +27,7 @@ defmodule Kvstore.Utils do
   def un_parse(data) do
     data = data |> Tuple.to_list
     @cliche 
-    |> Enum.map(fn {k, v} -> k end) #takes keys
+    |> Enum.map(fn {k, _} -> k end) #takes keys
     |> Enum.zip(data)               #zip with data
     |> Enum.into(%{})               #transform
   end
