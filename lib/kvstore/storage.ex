@@ -60,15 +60,17 @@ defmodule Kvstore.Storage do
     {:ok, state}
   end
 
+  def handle_cast(:check_after_power_off, [[]]), do: {:noreply, []}
+
   def handle_cast(:check_after_power_off, state) do
     state
-    |> Enum.map( 
+    |>Enum.map( 
       fn {key, date_of_death} ->
-        if date_of_death - DateTime.utc_now <= 0 do
+          if date_of_death - DateTime.utc_now <= 0 do
             GenServer.cast(self(), {:delete, key})
           else
             Process.send_after(self(), {:delete, key}, date_of_death - DateTime.utc_now)
-        end
+          end
       end)
     {:noreply, state}
   end
