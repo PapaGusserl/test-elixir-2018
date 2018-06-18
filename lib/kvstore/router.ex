@@ -1,41 +1,54 @@
 #TODO: Для веб сервера нужен маршрутизатор, место ему именно тут.
 defmodule Kvstore.Router do
   use Plug.Router
-  alias Kvstore.Storage
+  alias Kvstore.{Storage, Utils}
+  require Logger
 
+    plug Plug.Parsers, parsers: [:urlencoded, :multipart]
+
+
+  plug Plug.Logger, log: :debug
   plug :match
   plug :dispatch
-  plug Plug.Logger, log: :debug
 
-  get "/", do: send_resp(conn, 200, "Connect")
+  get "/connect", do: send_resp(conn, 200, "Connect")
+ 
 
   post "/create" do
-    body = valid? :data, 
-                  conn.body_params, 
-                  Storage.create
-    send_resp(conn, 200, body)    
+    params = Utils.parse(:conn, conn.body_params)
+             |> Map.merge(%{date: DateTime.utc_now()})
+    body = Utils.valid? :data, 
+                        params, 
+                        &(Storage.create(&1))
+    send_resp(conn, 200, "#{inspect body}")    
   end
 
   post "/read" do
-    body = valid? :keys, 
-                  conn.body_params,
-                  Storage.read
+    params = Utils.parse(:conn, conn.body_params)
+             |> Map.merge(%{date: DateTime.utc_now()})
+    body = Utils.valid? :keys, 
+                        params,
+                        &(Storage.read(&1))
     send_resp(conn, 200, body)    
   end
 
 
   post "/update" do
-    body = valid? :data, 
-                  conn.body_params.old_data, 
-                  conn.body_params.new_data, 
-                  Storage.update
+    old_params = Utils.parse(:conn, conn.body_params.old)
+    new_params = Utils.parse(:conn, conn.body_params.new)
+             |> Map.merge(%{date: DateTime.utc_now()})
+    body = Utils.valid? :data, 
+                        old_params, 
+                        new_params, 
+                        &(Storage.update(&1, &2))
     send_resp(conn, 200, body)
   end
 
   post "/delete" do
-    body = valid? :data,
-                  conn.body_params,
-                  Storage.delete
+    params = Utils.parse(:conn, conn.body_params)
+    body = Utils.valid? :data,
+                        params,
+                        &(Storage.delete(&1))
     send_resp(conn, 200, body)
   end
 
