@@ -34,4 +34,19 @@ defmodule KvstoreTest do
     assert Kvstore.Utils.un_parse([{1, :admin, "Vlad", nil}, {2, :mod, "Milyausha", nil}], []) == [%{id: 1, rules: :admin, username: "Vlad", date: nil}, %{id: 2, rules: :mod, username: "Milyausha", date: nil}]
   end
 
-end
+  test "parsing of ttl" do
+    refute Kvstore.Utils.parse(:ttl, 240) == DateTime.utc_now
+  end
+
+  test "existing of key in state" do
+    assert Kvstore.Storage.key_exist?(:key, [{"key", "value"}, {1, :value}, {:key, :value}]) == [{"key", "value"}, {1, :value}]
+  end
+
+  test "non-existing of key in state" do
+    assert Kvstore.Storage.key_exist?(:cluch, [{"key", "value"}, {1, :value}, {:key, :value}]) == [{"key", "value"}, {1, :value}, {:key, :value}]
+  end
+
+
+ 
+
+end 
