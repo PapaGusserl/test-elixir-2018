@@ -49,8 +49,10 @@ defmodule Kvstore.Router do
 
   #здесь тоже пока будет костыль
   post "/delete" do
-    body = conn.body_params["id"]
-           |> Storage.delete()
+    keys = Utils.parse(:conn, conn.body_params)
+    body = Utils.valid? :data,
+                        keys,
+                        &(Storage.delete(:keys, &1))
     send_resp(conn, 200, "#{inspect body}")
   end
 

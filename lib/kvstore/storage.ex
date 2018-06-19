@@ -73,17 +73,29 @@ defmodule Kvstore.Storage do
 
   def update(key, new_data) do
     old_data = read(key) |> Enum.at(0)
-    key |> Map.values |> Enum.at(0) |> delete
+    key = key |> Map.values |> Enum.at(0) 
+    delete(:key, key)
     Map.merge(old_data, new_data)
     |> create
   end
 
-  def delete(key) do
+  def delete(:keys, keys) do
+    Logger.info("delete #{inspect keys} from data_base")
+    keys = Utils.parse(:data, keys)
+    :dets.match_object(:storage, keys)
+    |> Enum.map(
+       fn obj ->
+         :dets.delete(:storage, elem(obj,0))
+         :dets.delete(:ttl, elem(obj, 0))
+       end)  
+   end
+
+  def delete(:key, key) do
     Logger.info("delete #{key} from data_base")
-    #   key = Utils.parse(:data, data) |> elem(0)
     :dets.delete(:storage, key)
     :dets.delete(:ttl, key)
   end
+  
 
   ### Callbacks
   
@@ -109,7 +121,7 @@ defmodule Kvstore.Storage do
   end
 
   def handle_cast({:delete, key}, state) do 
-    key |> delete
+    delete(:key, key)
     # if in state exist key, then delete this too
     new_state = key |> key_exist?(state) 
     {:noreply, new_state}
