@@ -1,21 +1,14 @@
 #TODO: Этот модуль должен реализовать механизмы CRUD для хранения данных. Если одного модуля будет мало, то допускается создание модулей с префиксом "Storage" в названии
 defmodule Kvstore.Storage do
   alias Kvstore.Utils
-
+  use GenServer
   require Logger
+
+  @default_ttl Application.get_env(:kvstore, :default_ttl)
   ## CRUD построена на :dets, т.к. в 
   ## данном случае не требуется более мощный функционал,
   ## который может предоставить mnesia или Postgres
   
-  ##  При входе в любую из структур CRUD 
-  ##  и выходе из нее data представляет собой map или struct,
-  ##  из-за чего приходится использовать парсеры и ан-парсеры
-  ##  этого можно избежать, изменив формат входных и выходных 
-  ##  данных, хотя мне представляется наиболее очевидным 
-  ##  вариантом использования данных структур
-
- use GenServer
-  alias Kvstore.Utils
  
   # Так как нам необходимо предусмотреть возможность
   # отключения программы с сохранением предустановленного
@@ -26,9 +19,7 @@ defmodule Kvstore.Storage do
   def start() do
     :dets.open_file(:ttl, [type: :set])
     :dets.open_file(:storage, [type: :set])
-    {:ok, pid} = start_link()
-    GenServer.cast(pid, :check_after_power_off)
-    {:ok, pid}
+    GenServer.cast(__MODULE__, :check_after_power_off)
   end
 
   ### API
@@ -37,15 +28,14 @@ defmodule Kvstore.Storage do
     GenServer.start_link(__MODULE__, state, name: __MODULE__)
   end
 
-  def create(data) do
-    data_rec = Utils.parse(:data, data)
-    if :dets.insert_new(:storage, data_rec) do
-      key_field = data_rec |> Tuple.to_list |> Enum.at(0)
-      ttl = unless Map.has_key?(data, :ttl), do:  Application.get_env(:kvstore, :default_ttl), else: String.to_integer(data.ttl)
-      # если ttl передается в формате секунд, его необходимо переделать в "дату смерти"
-      date_of_death = Utils.parse(:ttl, data.date, ttl)
+  def set(key, value, ttl \\ @default_ttl) do
+    now = DateTime.utc_now()
+    :dets.insert(:storage, {key, value, now})
+    ttl = if is_binary(ttl), do: String.to_integer(ttl), else: ttl
+    # если ttl передается в формате секунд, его необходимо переделать в "дату смерти"
+    date_of_death = Utils.parse(:ttl, now, ttl)
       # сохраняем в dets, чтобы между сеансами ничего не потерялось
-      :dets.insert_new(:ttl, {key_field, date_of_death})
+    :dets.insert_new(:ttl, {key, date_of_death})
       # в state  не отправляем, так как там у нас хранится только то, что
       # осталось с прошлой сессии 
       # and send to killing ttl in milliseconds, becouse we hope, that 
@@ -53,44 +43,19 @@ defmodule Kvstore.Storage do
       # never forget, that ttl was in seconds
       GenServer.cast(__MODULE__, {:set_timer, key_field, ttl*1000})
       {:ok}
-    else
-      {:error, "This key-field is already exist in storage!"}
-    end
  end
 
-  def read(keys) do
-    keys = Utils.parse(:keys, keys)
-    result = :dets.match_object(:storage, keys)
-    |> Enum.map( 
-      fn tuple -> 
-        ttl = :dets.match_object(:ttl, {elem(tuple, 0), :"_"})
-        |> Enum.at(0) #выбираем значение из списка(единственное, поэтому первое)
-        |> elem(1) #выбираем дату смерти
-        [tuple] |> Utils.un_parse([]) |> Enum.at(0)
-        |> Map.merge(%{date_of_death: ttl})
-      end)
+  def get(key) do
+    result = :dets.match_object(:storage, key)
+             |> Enum.map(&(get(:ttl, &1))
+ end
+
+  def get(:ttl, {key, _, _} = tuple) do
+        [{_, date_of_death}] = :dets.match_object(:ttl, {key, :"_"})
+        "object: #{inspect tuple}\n date_of_death: #{inspect date_of_death}"
   end
 
-  def update(key, new_data) do
-    old_data = read(key) |> Enum.at(0)
-    key = key |> Map.values |> Enum.at(0) 
-    delete(:key, key)
-    Map.merge(old_data, new_data)
-    |> create
-  end
-
-  def delete(:keys, keys) do
-    Logger.info("delete #{inspect keys} from data_base")
-    keys = Utils.parse(:data, keys)
-    :dets.match_object(:storage, keys)
-    |> Enum.map(
-       fn obj ->
-         :dets.delete(:storage, elem(obj,0))
-         :dets.delete(:ttl, elem(obj, 0))
-       end)  
-   end
-
-  def delete(:key, key) do
+  def delete(key) do
     Logger.info("delete #{key} from data_base")
     :dets.delete(:storage, key)
     :dets.delete(:ttl, key)
@@ -106,22 +71,24 @@ defmodule Kvstore.Storage do
 
   def handle_cast(:check_after_power_off, []), do: {:noreply, []}
 
-  require Logger
   def handle_cast(:check_after_power_off, state) do
     state
     |>Enum.map( 
-      fn {key, date_of_death} ->
-          if DateTime.to_unix(date_of_death) <= DateTime.to_unix(DateTime.utc_now()) do
-            GenServer.cast(self(), {:delete, key})
-          else
-            Process.send_after(self(), {:delete, key}, (DateTime.to_unix(date_of_death) - DateTime.to_unix(DateTime.utc_now))*1000)
-          end
-      end)
+                  end)
     {:noreply, state}
   end
 
+  def check(:state, {key, date_of_death}) do
+    ttl = DateTime.to_unix(date_of_death) - DateTime.to_unix(DateTime.utc_now)
+    if ttl<0 do
+      GenServer.cast(self(), {:delete, key})
+      else
+        Process.send_after(self(), {:delete, key}, ttl*1000)
+    end
+  end
+
   def handle_cast({:delete, key}, state) do 
-    delete(:key, key)
+    delete(key)
     # if in state exist key, then delete this too
     new_state = key |> key_exist?(state) 
     {:noreply, new_state}
@@ -141,11 +108,11 @@ defmodule Kvstore.Storage do
   def key_exist?(key, state) do
     state
     |> Enum.filter( fn {k, v} -> k == key end)
-    |> (fn
-      [{key, value}] -> state -- [{key, value}]
-      ______________ -> state
-    end).()
+    |> key_exist_in(state)
   end
+
+  defp key_exist_in([{_, _}] = row, state), do: state -- row
+  defp key_exist_in(_, state), do: state
 
 end
 
