@@ -16,9 +16,7 @@ defmodule Kvstore.Storage do
   # "через сколько необходимо записи удалиться", а к 
   # абсолютному времени
 
-  def start() do
-    :dets.open_file(:ttl, [type: :set])
-    :dets.open_file(:storage, [type: :set])
+  def run_db() do
     GenServer.cast(__MODULE__, :check_after_power_off)
   end
 
@@ -41,13 +39,13 @@ defmodule Kvstore.Storage do
       # and send to killing ttl in milliseconds, becouse we hope, that 
       # shit will selfkill in our session
       # never forget, that ttl was in seconds
-      GenServer.cast(__MODULE__, {:set_timer, key_field, ttl*1000})
+      GenServer.cast(__MODULE__, {:set_timer, key, ttl*1000})
       {:ok}
  end
 
   def get(key) do
-    result = :dets.match_object(:storage, key)
-             |> Enum.map(&(get(:ttl, &1))
+    :dets.match_object(:storage, {key, :"_", :"_"})
+    |> Enum.map(&(get(:ttl, &1)))
  end
 
   def get(:ttl, {key, _, _} = tuple) do
@@ -64,7 +62,9 @@ defmodule Kvstore.Storage do
 
   ### Callbacks
   
-  def init(state) do
+  def init([]) do
+    :dets.open_file(:storage, [type: :set])
+    :dets.open_file(:ttl, [type: :set])
     state = :dets.match_object(:ttl, {:"_", :"_"}) 
     {:ok, state}
   end
@@ -72,11 +72,27 @@ defmodule Kvstore.Storage do
   def handle_cast(:check_after_power_off, []), do: {:noreply, []}
 
   def handle_cast(:check_after_power_off, state) do
-    state
-    |>Enum.map( 
-                  end)
+    state |>Enum.each(&(check(:state, &1)))
     {:noreply, state}
   end
+
+  def handle_cast({:delete, key}, state) do 
+    delete(key)
+    # if in state exist key, then delete this too
+    new_state = key |> key_exist?(state) 
+    {:noreply, new_state}
+  end
+
+  def handle_cast({:set_timer, key, ttl}, state) do
+    Process.send_after(self(), {:delete, key}, ttl)
+    {:noreply, state}
+  end
+
+  def handle_info({:delete, key}, state) do
+    GenServer.cast(self(), {:delete, key})
+    {:noreply, state}
+  end
+
 
   def check(:state, {key, date_of_death}) do
     ttl = DateTime.to_unix(date_of_death) - DateTime.to_unix(DateTime.utc_now)
@@ -87,27 +103,9 @@ defmodule Kvstore.Storage do
     end
   end
 
-  def handle_cast({:delete, key}, state) do 
-    delete(key)
-    # if in state exist key, then delete this too
-    new_state = key |> key_exist?(state) 
-    {:noreply, new_state}
-  end
-
-  def handle_info({:delete, key}, state) do
-    GenServer.cast(self(), {:delete, key})
-    {:noreply, state}
-  end
-
-  def handle_cast({:set_timer, key, ttl}, state) do
-    Process.send_after(self(), {:delete, key}, ttl)
-    {:noreply, state}
-  end
-
-
   def key_exist?(key, state) do
     state
-    |> Enum.filter( fn {k, v} -> k == key end)
+    |> Enum.filter( fn {k, _} -> k == key end)
     |> key_exist_in(state)
   end
 

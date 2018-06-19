@@ -5,9 +5,9 @@ defmodule Kvstore.RouterTest do
   @opts Kvstore.Router.init([])
 
   setup_all do
-    conn = conn(:post, "/set", "username=router&ttl=3600")
-           |> put_req_header("content-type", "application/x-www-form-urlencoded")
-           |> Kvstore.Router.call(@opts)
+    conn(:post, "/set", "key=key&value=value&ttl=3600")
+    |> put_req_header("content-type", "application/x-www-form-urlencoded")
+    |> Kvstore.Router.call(@opts)
     {:ok, []}
   end
  
@@ -27,7 +27,7 @@ defmodule Kvstore.RouterTest do
   end
 
   test "set" do
-    conn = conn(:post, "/set", "username=router&ttl=6000")
+    conn = conn(:post, "/set", "key=yek&value=eulav&ttl=6000")
            |> put_req_header("content-type", "application/x-www-form-urlencoded")
            |> Kvstore.Router.call(@opts)
     assert conn.status == 200
@@ -35,12 +35,48 @@ defmodule Kvstore.RouterTest do
     assert conn.resp_body == "{:ok}"
   end
 
-  test "get" do
-    conn = conn(:post, "/read", "username")
+  test "set without ttl" do
+    conn = conn(:post, "/set", "key=kek&value=vulav")
            |> put_req_header("content-type", "application/x-www-form-urlencoded")
            |> Kvstore.Router.call(@opts)
     assert conn.status == 200
     assert conn.state == :sent
+    assert conn.resp_body == "{:ok}"
+  end
+
+  test "un-lucky set" do
+    conn = conn(:post, "/set", "kexy=yek&vxalue=eulav&ttlx=6000")
+           |> put_req_header("content-type", "application/x-www-form-urlencoded")
+           |> Kvstore.Router.call(@opts)
+    assert conn.status == 200
+    assert conn.state == :sent
+    assert conn.resp_body == "Invalid! Keys aren't found!"
+  end
+
+  test "get" do
+    conn = conn(:post, "/get", "key=key")
+           |> put_req_header("content-type", "application/x-www-form-urlencoded")
+           |> Kvstore.Router.call(@opts)
+    assert conn.state == :sent
+    assert conn.status == 200
+  end
+
+  test "un-lucky get" do
+    conn = conn(:post, "/get", "value=eulav")
+           |> put_req_header("content-type", "application/x-www-form-urlencoded")
+           |> Kvstore.Router.call(@opts)
+    assert conn.status == 200
+    assert conn.state == :sent
+    assert conn.resp_body == "Invalid! Keys aren't found!"
+  end
+
+  test "delete" do
+    conn = conn(:post, "/delete", "key=key")
+           |> put_req_header("content-type", "application/x-www-form-urlencoded")
+           |> Kvstore.Router.call(@opts)
+    assert conn.status == 200
+    assert conn.state == :sent
+    assert conn.resp_body == ":ok"
   end
 
 
