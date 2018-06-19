@@ -34,23 +34,24 @@ defmodule Kvstore.Router do
   end
 
 
-  post "/update" do
-    old_params = Utils.parse(:conn, conn.body_params.old)
-    new_params = Utils.parse(:conn, conn.body_params.new)
+  #костыльная связка: апдейтить можно только по id 
+  post "/update" do 
+    key = %{id: conn.body_params["id"]}
+    new_params = Utils.parse(:conn, conn.body_params)
              |> Map.merge(%{date: DateTime.utc_now()})
+             |> Map.delete(:id)
     body = Utils.valid? :data, 
-                        old_params, 
+                        key, 
                         new_params, 
                         &(Storage.update(&1, &2))
-    send_resp(conn, 200, body)
+    send_resp(conn, 200, "#{inspect body}")
   end
 
+  #здесь тоже пока будет костыль
   post "/delete" do
-    params = Utils.parse(:conn, conn.body_params)
-    body = Utils.valid? :data,
-                        params,
-                        &(Storage.delete(&1))
-    send_resp(conn, 200, body)
+    body = conn.body_params["id"]
+           |> Storage.delete()
+    send_resp(conn, 200, "#{inspect body}")
   end
 
   match _, do: send_resp(conn, 404, "Ooops..")

@@ -78,8 +78,4 @@ defmodule KvstoreTest do
     assert result.date_of_death == @result_for_read.date_of_death
   end
 
-  test "update row" do
-    assert Kvstore.Storage.update(%{id: "1"}, %{id: "1", rules: "admin", username: "Akhtyamov"}) == {:ok}
-  end
-
 end

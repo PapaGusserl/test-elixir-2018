@@ -71,10 +71,11 @@ defmodule Kvstore.Storage do
       end)
   end
 
-  def update(old_data, new_data) do
-    Utils.parse(:data, old_data) |> delete
-    new_data |> create
-    {:ok}
+  def update(key, new_data) do
+    old_data = read(key) |> Enum.at(0)
+    key |> Map.values |> Enum.at(0) |> delete
+    Map.merge(old_data, new_data)
+    |> create
   end
 
   def delete(key) do
