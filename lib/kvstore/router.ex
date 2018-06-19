@@ -25,10 +25,11 @@ defmodule Kvstore.Router do
 
   post "/read" do
     params = Utils.parse(:conn, conn.body_params)
-             |> Map.merge(%{date: DateTime.utc_now()})
-    body = Utils.valid? :keys, 
+    body = Utils.valid?(:data, 
                         params,
-                        &(Storage.read(&1))
+                        &(Storage.read(&1)))
+                        |> Enum.map(fn x -> "#{inspect x}" end)
+                        |> Enum.join("\n")
     send_resp(conn, 200, body)    
   end
 

@@ -60,9 +60,6 @@ defmodule KvstoreTest do
     {:ok, []}
   end
 
-  test "creating new row" do
-  end
-
   test "read row on field id" do
     result = Kvstore.Storage.read(%{id: "1"}) |> Enum.at(0)
     assert result.id == @result_for_read.id
@@ -85,7 +82,4 @@ defmodule KvstoreTest do
     assert Kvstore.Storage.update(%{id: "1"}, %{id: "1", rules: "admin", username: "Akhtyamov"}) == {:ok}
   end
 
-  test "temple?" do
-    refute Kvstore.Storage.read(%{id: 2}) == @result_for_read
-  end
 end
