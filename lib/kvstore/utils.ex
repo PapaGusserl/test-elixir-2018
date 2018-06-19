@@ -29,7 +29,7 @@ defmodule Kvstore.Utils do
       |> Map.keys
       |> Enum.map(
         fn key ->
-          Application.get_env(:kvstore, :keys) 
+          Application.get_env(:kvstore, :keys_ttl) 
           |> Enum.into(%{}) 
           |> Map.has_key?(key)
           |> (fn

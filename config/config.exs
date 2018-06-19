@@ -34,4 +34,11 @@ config :kvstore, keys: [
                           username: :string,
                           date: :date
                         ]
+config :kvstore, keys_ttl: [
+                          id: :int, 
+                          ttl: :string,
+                          rules: :atom,
+                          username: :string,
+                          date: :date
+                        ]
 config :kvstore, default_ttl: 3600

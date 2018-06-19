@@ -27,5 +27,14 @@ defmodule Kvstore.RouterTest do
     assert conn.resp_body == "{:error, \"Key itd isn't exist!;\\nKey usename isn't exist!\"}"
   end
 
+  test "creating" do
+    conn = conn(:post, "/create", "id=2&username=router&rules=admin&ttl=60")
+           |> put_req_header("content-type", "application/x-www-form-urlencoded")
+           |> Kvstore.Router.call(@opts)
+    assert conn.status == 200
+    assert conn.state == :sent
+    assert conn.resp_body == "{:ok}"
+  end
+
 
 end
