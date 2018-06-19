@@ -13,10 +13,8 @@ defmodule Kvstore.Router do
   plug :dispatch
 
   get "/connect", do: send_resp(conn, 200, "Connect")
- 
 
   post "/set" do
-    
     body = case conn.body_params do
       %{"key" => key, "value" => value , "ttl" => ttl} -> Storage.set(key, value, ttl) |> inspect
       %{"key" => key, "value" => value} -> Storage.set(key, value) |> inspect
