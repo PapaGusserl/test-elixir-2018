@@ -109,8 +109,8 @@ defmodule Kvstore.Utils do
     |> Enum.into(%{})               #transform
   end
 
-  def parse(:ttl, sec) do
-    now = DateTime.utc_now |> DateTime.to_unix
+  def parse(:ttl, date, sec) do
+    now = date |> DateTime.to_unix
     now - sec
     |> DateTime.from_unix!
   end   

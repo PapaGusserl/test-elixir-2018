@@ -2,6 +2,7 @@
 defmodule Kvstore.Storage do
   alias Kvstore.Utils
 
+  require Logger
   ## CRUD построена на :dets, т.к. в 
   ## данном случае не требуется более мощный функционал,
   ## который может предоставить mnesia или Postgres
@@ -37,62 +38,65 @@ defmodule Kvstore.Storage do
   end
 
   def create(data) do
-    data = Utils.parse(:data, data)
-    if :dets.insert_new(:storage, data) do
-      key_field = Enum.first(data)
-      ttl = if data.ttl == nil, do:  Application.get_env(:kvstore, :default_ttl), else: data.ttl
+    data_rec = Utils.parse(:data, data)
+    if :dets.insert_new(:storage, data_rec) do
+      key_field = data_rec |> Tuple.to_list |> Enum.at(0)
+      ttl = if data.ttl == nil, do:  Application.get_env(:kvstore, :default_ttl), else: String.to_integer(data.ttl)
       # если ttl передается в формате секунд, его необходимо переделать в "дату смерти"
-      date_of_death = Utils.parse(:ttl, ttl)
+      date_of_death = Utils.parse(:ttl, data.date, ttl)
       # сохраняем в dets, чтобы между сеансами ничего не потерялось
       :dets.insert_new(:ttl, {key_field, date_of_death})
       # в state  не отправляем, так как там у нас хранится только то, что
       # осталось с прошлой сессии 
       # and send to killing ttl in milliseconds, becouse we hope, that 
       # shit will selfkill in our session
-      GenServer.cast(__MODULE__, {:set_timer, key_field, data.ttl})
+      # never forget, that ttl was in seconds
+      GenServer.cast(__MODULE__, {:set_timer, key_field, ttl})
       {:ok}
     else
       {:error, "This key-field is already exist in storage!"}
     end
  end
 
-  def read(data) do
-     keys = Utils.parse(:keys, keys)
+  def read(keys) do
+    keys = Utils.parse(:keys, keys)
     :dets.match_object(:storage, keys)
-    |> Utils.un_parse([])
     |> Enum.map( 
-      fn map -> 
-        :dets.match_object(:ttl, {Enum.first(map), :"_"})
-        |>Map.merge(map) 
+      fn tuple -> 
+        ttl = :dets.match_object(:ttl, {elem(tuple, 0), :"_"})
+        |> Enum.at(0) #выбираем значение из списка(единственное, поэтому первое)
+        |> elem(1) #выбираем дату смерти
+        [tuple] |> Utils.un_parse([]) |> Enum.at(0)
+        |> Map.merge(%{date_of_death: ttl})
       end)
   end
 
   def update(old_data, new_data) do
     Utils.parse(:data, old_data) |> delete
-    Utils.parse(:data, new_data) |> create
+    new_data |> create
     {:ok}
   end
 
-  def delete(data) do
-    data = Utils.parse(:data, data)
-    :dets.delete(:storage, data)
-    :dets.delete(:ttl, data)
+  def delete(key) do
+    #   key = Utils.parse(:data, data) |> elem(0)
+    :dets.delete(:storage, key)
+    :dets.delete(:ttl, key)
   end
 
   ### Callbacks
   
   def init(state) do
-    state = [state | :dets.match_object(:ttl, {:"_", :"_"}) ]
+    state = :dets.match_object(:ttl, {:"_", :"_"}) 
     {:ok, state}
   end
 
-  def handle_cast(:check_after_power_off, [[]]), do: {:noreply, []}
+  def handle_cast(:check_after_power_off, []), do: {:noreply, []}
 
   def handle_cast(:check_after_power_off, state) do
     state
     |>Enum.map( 
       fn {key, date_of_death} ->
-          if date_of_death - DateTime.utc_now <= 0 do
+          if DateTime.to_unix(date_of_death) - DateTime.to_unix(DateTime.utc_now()) <= 0 do
             GenServer.cast(self(), {:delete, key})
           else
             Process.send_after(self(), {:delete, key}, date_of_death - DateTime.utc_now)
@@ -108,12 +112,14 @@ defmodule Kvstore.Storage do
     {:noreply, new_state}
   end
 
-  def handle_info({:delete, key}, _state) do
+  def handle_info({:delete, key}, state) do
     GenServer.cast(self(), {:delete, key})
+    {:noreply, state}
   end
 
-  def handle_cast({:set_timer, key, ttl}, _state) do
+  def handle_cast({:set_timer, key, ttl}, state) do
     Process.send_after(self(), {:delete, key}, ttl)
+    {:noreply, state}
   end
 
 

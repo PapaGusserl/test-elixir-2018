@@ -30,8 +30,8 @@ use Mix.Config
 #     import_config "#{Mix.env}.exs"
 config :kvstore, keys: [
                           id: :int, 
-                          username: :string,
                           rules: :atom,
+                          username: :string,
                           date: :date
                         ]
 config :kvstore, default_ttl: 3600

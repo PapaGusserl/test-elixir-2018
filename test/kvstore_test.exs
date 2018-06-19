@@ -35,7 +35,7 @@ defmodule KvstoreTest do
   end
 
   test "parsing of ttl" do
-    refute Kvstore.Utils.parse(:ttl, 240) == DateTime.utc_now
+    refute Kvstore.Utils.parse(:ttl, DateTime.utc_now(), 240) == DateTime.utc_now
   end
 
   test "existing of key in state" do
@@ -48,31 +48,44 @@ defmodule KvstoreTest do
 
 
  
+  @data %{id: "1", ttl: "2000", username: "vlad", rules: "admin", date: DateTime.utc_now()}
 
-  @result_for_read {:ok, %{id: 1, username: "Vlad", rules: :admin, date: DateTime.utc_now()}}
+  @date_of_death Kvstore.Utils.parse(:ttl, @data.date, String.to_integer(@data.ttl))
 
-  test "creating new row" do
-    assert Kvstore.Storage.create(%{id: 1, username: "Vlad", rules: :admin, date: DateTime.utc_now()}, %{ttl: :infinit}) == {:ok}
+  @result_for_read %{id: "1", date_of_death: @date_of_death, username: "vlad", rules: "admin", date: DateTime.utc_now()}
+
+
+  setup_all do
+    Kvstore.Storage.create(@data)
+    {:ok, []}
   end
 
-  test "read row on field :id" do
-    assert Kvstore.Storage.read(%{id: 1}) == @result_for_read
+  test "creating new row" do
+  end
+
+  test "read row on field id" do
+    result = Kvstore.Storage.read(%{id: "1"}) |> Enum.at(0)
+    assert result.id == @result_for_read.id
+    assert result.username == @result_for_read.username
+    assert result.rules == @result_for_read.rules
+    assert_in_delta DateTime.to_unix(result.date_of_death), DateTime.to_unix(@result_for_read.date_of_death), 1
+    assert result.date_of_death == @result_for_read.date_of_death
   end
 
   test "read row on field :username" do
-    assert Kvstore.Storage.read(%{username: "Vlad"}) == @result_for_read
-  end
-
-  test "read row on field :rules" do
-    assert Kvstore.Storage.read(%{rules: :admin}) == @result_for_read
+    result = Kvstore.Storage.read(%{username: "vlad"}) |> Enum.at(0)
+    assert result.id == @result_for_read.id
+    assert result.username == @result_for_read.username
+    assert result.rules == @result_for_read.rules
+    assert_in_delta DateTime.to_unix(result.date_of_death), DateTime.to_unix(@result_for_read.date_of_death), 1
+    assert result.date_of_death == @result_for_read.date_of_death
   end
 
   test "update row" do
-    assert Kvstore.Storage.update(%{id: 1}, %{username: "Akhtyamov"}) == {:ok, %{id: 1, username: "Akhtyamov", rules: :admin}}
+    assert Kvstore.Storage.update(%{id: "1"}, %{id: "1", rules: "admin", username: "Akhtyamov"}) == {:ok}
   end
 
   test "temple?" do
-    Kvstore.Storage.create(%{id: 2, date: DateTime.utc_now()}, %{ ttl: 1})
     refute Kvstore.Storage.read(%{id: 2}) == @result_for_read
   end
 end
