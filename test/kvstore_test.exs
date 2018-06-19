@@ -48,7 +48,7 @@ defmodule KvstoreTest do
 
 
  
-  @data %{id: "1", ttl: "2000", username: "vlad", rules: "admin", date: DateTime.utc_now()}
+  @data %{id: "1", ttl: "10000", username: "vlad", rules: "admin", date: DateTime.utc_now()}
 
   @date_of_death Kvstore.Utils.parse(:ttl, @data.date, String.to_integer(@data.ttl))
 

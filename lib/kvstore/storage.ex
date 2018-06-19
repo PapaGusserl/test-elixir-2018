@@ -41,7 +41,7 @@ defmodule Kvstore.Storage do
     data_rec = Utils.parse(:data, data)
     if :dets.insert_new(:storage, data_rec) do
       key_field = data_rec |> Tuple.to_list |> Enum.at(0)
-      ttl = if data.ttl == nil, do:  Application.get_env(:kvstore, :default_ttl), else: String.to_integer(data.ttl)
+      ttl = unless Map.has_key?(data, :ttl), do:  Application.get_env(:kvstore, :default_ttl), else: String.to_integer(data.ttl)
       # если ttl передается в формате секунд, его необходимо переделать в "дату смерти"
       date_of_death = Utils.parse(:ttl, data.date, ttl)
       # сохраняем в dets, чтобы между сеансами ничего не потерялось
@@ -51,7 +51,7 @@ defmodule Kvstore.Storage do
       # and send to killing ttl in milliseconds, becouse we hope, that 
       # shit will selfkill in our session
       # never forget, that ttl was in seconds
-      GenServer.cast(__MODULE__, {:set_timer, key_field, ttl})
+      GenServer.cast(__MODULE__, {:set_timer, key_field, ttl*1000})
       {:ok}
     else
       {:error, "This key-field is already exist in storage!"}
@@ -60,7 +60,7 @@ defmodule Kvstore.Storage do
 
   def read(keys) do
     keys = Utils.parse(:keys, keys)
-    :dets.match_object(:storage, keys)
+    result = :dets.match_object(:storage, keys)
     |> Enum.map( 
       fn tuple -> 
         ttl = :dets.match_object(:ttl, {elem(tuple, 0), :"_"})
@@ -78,6 +78,7 @@ defmodule Kvstore.Storage do
   end
 
   def delete(key) do
+    Logger.info("delete #{key} from data_base")
     #   key = Utils.parse(:data, data) |> elem(0)
     :dets.delete(:storage, key)
     :dets.delete(:ttl, key)
@@ -92,14 +93,15 @@ defmodule Kvstore.Storage do
 
   def handle_cast(:check_after_power_off, []), do: {:noreply, []}
 
+  require Logger
   def handle_cast(:check_after_power_off, state) do
     state
     |>Enum.map( 
       fn {key, date_of_death} ->
-          if DateTime.to_unix(date_of_death) - DateTime.to_unix(DateTime.utc_now()) <= 0 do
+          if DateTime.to_unix(date_of_death) <= DateTime.to_unix(DateTime.utc_now()) do
             GenServer.cast(self(), {:delete, key})
           else
-            Process.send_after(self(), {:delete, key}, date_of_death - DateTime.utc_now)
+            Process.send_after(self(), {:delete, key}, (DateTime.to_unix(date_of_death) - DateTime.to_unix(DateTime.utc_now))*1000)
           end
       end)
     {:noreply, state}
